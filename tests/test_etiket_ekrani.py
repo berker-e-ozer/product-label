@@ -9,23 +9,24 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import services.etiket_ekrani_service as servis
 
 
-class TestSiparisler(unittest.TestCase):
+class TestUrunler(unittest.TestCase):
     def test_sahte_veri_yuklenebilir(self):
-        veri = servis.siparisleri_getir()
+        veri = servis.urunleri_getir()
         self.assertIsInstance(veri, list)
         self.assertGreater(len(veri), 0)
 
-    def test_siparis_yapisi(self):
-        veri = servis.siparisleri_getir()
+    def test_urun_yapisi(self):
+        veri = servis.urunleri_getir()
         ilk = veri[0]
-        self.assertIn("anahtar", ilk)
-        self.assertIn("no", ilk)
-        self.assertIn("musteri", ilk)
-        self.assertIn("tarih", ilk)
-        self.assertIn("kargo", ilk)
-        self.assertIn("firma", ilk["kargo"])
-        self.assertIn("il", ilk["kargo"])
-        self.assertIn("ilce", ilk["kargo"])
+        self.assertIn("id", ilk)
+        self.assertIn("ad", ilk)
+        self.assertIn("birim", ilk)
+        self.assertIn("uretim_yeri", ilk)
+
+    def test_urun_id_benzersiz(self):
+        veri = servis.urunleri_getir()
+        idler = [u["id"] for u in veri]
+        self.assertEqual(len(idler), len(set(idler)))
 
 
 class TestAyarlar(unittest.TestCase):
@@ -40,19 +41,19 @@ class TestAyarlar(unittest.TestCase):
 
     def test_varsayilan_ayarlar(self):
         ayarlar = servis.ayarlari_getir("test")
-        self.assertEqual(ayarlar["etiket_genislik"], 50)
-        self.assertEqual(ayarlar["etiket_yukseklik"], 70)
-        self.assertTrue(ayarlar["siparis_no_kalin"])
+        self.assertEqual(ayarlar["etiket_genislik"], 38)
+        self.assertEqual(ayarlar["etiket_yukseklik"], 58)
+        self.assertTrue(ayarlar["urun_adi_kalin"])
 
     def test_kaydet_ve_oku(self):
         yeni = dict(servis.VARSAYILAN_AYARLAR)
         yeni["etiket_genislik"] = 80
-        yeni["kargo_boyut"] = 24
+        yeni["fiyat_boyut"] = 40
         servis.ayarlari_kaydet("test", yeni)
 
         okunan = servis.ayarlari_getir("test")
         self.assertEqual(okunan["etiket_genislik"], 80)
-        self.assertEqual(okunan["kargo_boyut"], 24)
+        self.assertEqual(okunan["fiyat_boyut"], 40)
 
     def test_upsert(self):
         servis.ayarlari_kaydet("test", {"etiket_genislik": 60})
@@ -72,14 +73,18 @@ class TestEtiketBas(unittest.TestCase):
         os.unlink(self.tmp.name)
 
     def test_basim_stub(self):
-        sonuc = servis.etiket_bas("shopify:1001")
+        sonuc = servis.etiket_bas("urun-001", "Beyaz Pecete 100lu", "24.90")
         self.assertTrue(sonuc["ok"])
 
     def test_basim_log(self):
-        servis.etiket_bas("shopify:1001")
-        servis.etiket_bas("shopify:1002")
-        log = servis.basim_logunu_getir()
-        self.assertEqual(len(log), 2)
+        servis.etiket_bas("urun-001", "Beyaz Pecete 100lu", "24.90")
+        servis.etiket_bas("urun-002", "Renkli Pecete 50li", "18.50")
+        baglanti = servis._db_baglan()
+        try:
+            sayac = baglanti.execute("SELECT COUNT(*) FROM etiket_basim_log").fetchone()[0]
+            self.assertEqual(sayac, 2)
+        finally:
+            baglanti.close()
 
 
 class TestFlaskRoutes(unittest.TestCase):
@@ -108,17 +113,19 @@ class TestFlaskRoutes(unittest.TestCase):
         r = self.client.get("/etiket-ekrani")
         self.assertEqual(r.status_code, 200)
 
-    def test_siparisler_api(self):
-        r = self.client.get("/api/etiket-ekrani/siparisler")
+    def test_urunler_api(self):
+        r = self.client.get("/api/etiket-ekrani/urunler")
         self.assertEqual(r.status_code, 200)
         veri = r.get_json()
         self.assertIsInstance(veri, list)
+        self.assertGreater(len(veri), 0)
 
     def test_ayarlar_api(self):
         r = self.client.get("/api/etiket-ekrani/ayarlar")
         self.assertEqual(r.status_code, 200)
         veri = r.get_json()
         self.assertIn("etiket_genislik", veri)
+        self.assertIn("urun_adi_kalin", veri)
 
     def test_ayarlar_kaydet_api(self):
         r = self.client.post(
@@ -132,7 +139,7 @@ class TestFlaskRoutes(unittest.TestCase):
     def test_bas_api(self):
         r = self.client.post(
             "/api/etiket-ekrani/bas",
-            json={"anahtarlar": ["shopify:1001"]},
+            json={"etiketler": [{"id": "urun-001", "ad": "Beyaz Pecete", "fiyat": "24.90"}]},
             content_type="application/json",
         )
         self.assertEqual(r.status_code, 200)
@@ -141,10 +148,32 @@ class TestFlaskRoutes(unittest.TestCase):
     def test_bas_api_bos(self):
         r = self.client.post(
             "/api/etiket-ekrani/bas",
-            json={"anahtarlar": []},
+            json={"etiketler": []},
             content_type="application/json",
         )
         self.assertEqual(r.status_code, 400)
+
+    def test_bas_api_etiket_yok(self):
+        r = self.client.post(
+            "/api/etiket-ekrani/bas",
+            json={},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_bas_api_coklu(self):
+        r = self.client.post(
+            "/api/etiket-ekrani/bas",
+            json={"etiketler": [
+                {"id": "urun-001", "ad": "Beyaz Pecete", "fiyat": "24.90"},
+                {"id": "urun-002", "ad": "Renkli Pecete", "fiyat": "18.50"},
+            ]},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        veri = r.get_json()
+        self.assertTrue(veri["ok"])
+        self.assertEqual(len(veri["sonuclar"]), 2)
 
 
 if __name__ == "__main__":

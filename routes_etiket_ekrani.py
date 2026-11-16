@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify
 from services.etiket_ekrani_service import (
-    siparisleri_getir,
+    urunleri_getir,
     ayarlari_getir,
     ayarlari_kaydet,
     etiket_bas,
@@ -20,13 +20,13 @@ def sayfa():
     )
 
 
-@bp.route("/api/etiket-ekrani/siparisler")
-def siparisler():
+@bp.route("/api/etiket-ekrani/urunler")
+def urunler():
     try:
-        veri = siparisleri_getir()
+        veri = urunleri_getir()
         return jsonify(veri)
     except Exception as e:
-        return jsonify({"error": f"Siparişler yüklenirken hata oluştu: {e}"}), 500
+        return jsonify({"error": f"Ürünler yüklenirken hata oluştu: {e}"}), 500
 
 
 @bp.route("/api/etiket-ekrani/ayarlar", methods=["GET"])
@@ -54,21 +54,21 @@ def ayarlar_yaz():
 def bas():
     try:
         gelen = request.get_json()
-        if not gelen or "anahtarlar" not in gelen:
-            return jsonify({"error": "Basılacak sipariş anahtarları belirtilmedi"}), 400
+        if not gelen or "etiketler" not in gelen:
+            return jsonify({"error": "Basılacak etiket verisi belirtilmedi"}), 400
 
-        anahtarlar = gelen["anahtarlar"]
-        if not isinstance(anahtarlar, list) or len(anahtarlar) == 0:
-            return jsonify({"error": "En az bir sipariş seçmelisiniz"}), 400
+        etiketler = gelen["etiketler"]
+        if not isinstance(etiketler, list) or len(etiketler) == 0:
+            return jsonify({"error": "En az bir ürün seçmelisiniz"}), 400
 
         sonuclar = []
-        for anahtar in anahtarlar:
-            sonuc = etiket_bas(anahtar)
+        for et in etiketler:
+            sonuc = etiket_bas(et.get("id", ""), et.get("ad", ""), et.get("fiyat", ""))
             sonuclar.append(sonuc)
 
         return jsonify({
             "ok": True,
-            "mesaj": f"{len(anahtarlar)} etiket basım komutu gönderildi",
+            "mesaj": f"{len(etiketler)} etiket basım komutu gönderildi",
             "sonuclar": sonuclar,
         })
     except Exception as e:

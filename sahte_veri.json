@@ -1,82 +1,14 @@
 [
-  {
-    "anahtar": "shopify:1001",
-    "no": "#9001",
-    "musteri": "Ayşe Yılmaz",
-    "alici": "",
-    "tarih": "2026-11-12T10:15:00+03:00",
-    "kargo": {"firma": "Yurtiçi", "il": "Ankara", "ilce": "Çankaya"}
-  },
-  {
-    "anahtar": "shopify:1002",
-    "no": "#9002",
-    "musteri": "Mehmet Demir",
-    "alici": "Zeynep Demir",
-    "tarih": "2026-11-12T11:30:00+03:00",
-    "kargo": {"firma": "Aras", "il": "İstanbul", "ilce": "Kadıköy"}
-  },
-  {
-    "anahtar": "shopify:1003",
-    "no": "#9003",
-    "musteri": "Fatma Kaya",
-    "alici": "",
-    "tarih": "2026-11-13T09:00:00+03:00",
-    "kargo": {"firma": "MNG", "il": "İzmir", "ilce": "Bornova"}
-  },
-  {
-    "anahtar": "shopify:1004",
-    "no": "#9004",
-    "musteri": "Ali Çelik",
-    "alici": "Hasan Çelik",
-    "tarih": "2026-11-13T14:20:00+03:00",
-    "kargo": {"firma": "Yurtiçi", "il": "Bursa", "ilce": "Nilüfer"}
-  },
-  {
-    "anahtar": "shopify:1005",
-    "no": "#9005",
-    "musteri": "Elif Şahin",
-    "alici": "",
-    "tarih": "2026-11-14T08:45:00+03:00",
-    "kargo": {"firma": "Sürat", "il": "Antalya", "ilce": "Muratpaşa"}
-  },
-  {
-    "anahtar": "elden:2001",
-    "no": "#D-001",
-    "musteri": "Kemal Öztürk",
-    "alici": "",
-    "tarih": "2026-11-14T10:00:00+03:00",
-    "kargo": {"firma": "Elden Teslim", "il": "Ankara", "ilce": "Yenimahalle"}
-  },
-  {
-    "anahtar": "shopify:1006",
-    "no": "#9006",
-    "musteri": "Derya Arslan",
-    "alici": "Murat Arslan",
-    "tarih": "2026-11-14T16:10:00+03:00",
-    "kargo": {"firma": "Aras", "il": "Konya", "ilce": "Selçuklu"}
-  },
-  {
-    "anahtar": "shopify:1007",
-    "no": "#9007",
-    "musteri": "Hülya Korkmaz",
-    "alici": "",
-    "tarih": "2026-11-15T09:30:00+03:00",
-    "kargo": {"firma": "MNG", "il": "Eskişehir", "ilce": "Tepebaşı"}
-  },
-  {
-    "anahtar": "shopify:1008",
-    "no": "#9008",
-    "musteri": "Burak Aydın",
-    "alici": "",
-    "tarih": "2026-11-15T13:00:00+03:00",
-    "kargo": {"firma": "Yurtiçi", "il": "Trabzon", "ilce": "Ortahisar"}
-  },
-  {
-    "anahtar": "elden:2002",
-    "no": "#D-002",
-    "musteri": "Selin Erdoğan",
-    "alici": "Can Erdoğan",
-    "tarih": "2026-11-16T10:00:00+03:00",
-    "kargo": {"firma": "Elden Teslim", "il": "Ankara", "ilce": "Çankaya"}
-  }
+  {"id": "urun-001", "ad": "Beyaz Peçete 100'lü", "birim": "TL/Paket", "uretim_yeri": "Ankara"},
+  {"id": "urun-002", "ad": "Renkli Peçete 50'li", "birim": "TL/Paket", "uretim_yeri": "Ankara"},
+  {"id": "urun-003", "ad": "Kağıt Havlu 6'lı Rulo", "birim": "TL/Paket", "uretim_yeri": "İstanbul"},
+  {"id": "urun-004", "ad": "Islak Mendil 90'lı", "birim": "TL/Adet", "uretim_yeri": "Ankara"},
+  {"id": "urun-005", "ad": "Tuvalet Kağıdı 32'li", "birim": "TL/Paket", "uretim_yeri": "İstanbul"},
+  {"id": "urun-006", "ad": "Endüstriyel Havlu 1kg", "birim": "TL/Rulo", "uretim_yeri": "Ankara"},
+  {"id": "urun-007", "ad": "Masa Örtüsü 120x180", "birim": "TL/Adet", "uretim_yeri": "Bursa"},
+  {"id": "urun-008", "ad": "Peçete Dispenseri", "birim": "TL/Adet", "uretim_yeri": "İstanbul"},
+  {"id": "urun-009", "ad": "Kağıt Havlu Tekli", "birim": "TL/Adet", "uretim_yeri": "Ankara"},
+  {"id": "urun-010", "ad": "Z Katlama Havlu 200'lü", "birim": "TL/Paket", "uretim_yeri": "Bursa"},
+  {"id": "urun-011", "ad": "Mini Peçete 250'li", "birim": "TL/Paket", "uretim_yeri": "Ankara"},
+  {"id": "urun-012", "ad": "Jumbo Tuvalet Kağıdı", "birim": "TL/Rulo", "uretim_yeri": "İstanbul"}
 ]
