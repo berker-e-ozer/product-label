@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="tr" class="">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Etiket Ekranı{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <style>
+    /* Fallback: Tailwind CDN yuklenemezse temel siniflar */
+    .hidden { display: none !important; }
+    @media print { .no-print { display: none !important; } }
+    .animate-spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
+
+  <header class="no-print bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <span class="text-lg font-bold text-gray-800 dark:text-gray-200">Yönetim Paneli</span>
+      <button onclick="temaToggle()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+        <i class="ph ph-moon text-xl dark:hidden"></i>
+        <i class="ph ph-sun text-xl hidden dark:inline"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <div id="yuklemePerdesi" class="hidden fixed inset-0 z-50 bg-black/30 dark:bg-black/50 flex items-center justify-center no-print">
+    <div class="bg-white dark:bg-gray-800 rounded-xl px-6 py-4 shadow-xl flex items-center gap-3">
+      <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" fill="none">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path>
+      </svg>
+      <span id="yuklemeMesaj" class="text-sm font-medium text-gray-700 dark:text-gray-300"></span>
+    </div>
+  </div>
+
+  <script>
+    function showLoading(mesaj) {
+      document.getElementById('yuklemeMesaj').textContent = mesaj || 'Yükleniyor...';
+      document.getElementById('yuklemePerdesi').classList.remove('hidden');
+    }
+    function hideLoading() {
+      document.getElementById('yuklemePerdesi').classList.add('hidden');
+    }
+    function temaToggle() {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem('tema', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    }
+    (function() {
+      var tema = localStorage.getItem('tema');
+      if (tema === 'dark' || (!tema && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
