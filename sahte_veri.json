@@ -1,14 +1,14 @@
 [
-  {"id": "urun-001", "ad": "Beyaz Peçete 100'lü", "birim": "TL/Paket", "uretim_yeri": "Ankara"},
-  {"id": "urun-002", "ad": "Renkli Peçete 50'li", "birim": "TL/Paket", "uretim_yeri": "Ankara"},
-  {"id": "urun-003", "ad": "Kağıt Havlu 6'lı Rulo", "birim": "TL/Paket", "uretim_yeri": "İstanbul"},
-  {"id": "urun-004", "ad": "Islak Mendil 90'lı", "birim": "TL/Adet", "uretim_yeri": "Ankara"},
-  {"id": "urun-005", "ad": "Tuvalet Kağıdı 32'li", "birim": "TL/Paket", "uretim_yeri": "İstanbul"},
-  {"id": "urun-006", "ad": "Endüstriyel Havlu 1kg", "birim": "TL/Rulo", "uretim_yeri": "Ankara"},
-  {"id": "urun-007", "ad": "Masa Örtüsü 120x180", "birim": "TL/Adet", "uretim_yeri": "Bursa"},
-  {"id": "urun-008", "ad": "Peçete Dispenseri", "birim": "TL/Adet", "uretim_yeri": "İstanbul"},
-  {"id": "urun-009", "ad": "Kağıt Havlu Tekli", "birim": "TL/Adet", "uretim_yeri": "Ankara"},
-  {"id": "urun-010", "ad": "Z Katlama Havlu 200'lü", "birim": "TL/Paket", "uretim_yeri": "Bursa"},
-  {"id": "urun-011", "ad": "Mini Peçete 250'li", "birim": "TL/Paket", "uretim_yeri": "Ankara"},
-  {"id": "urun-012", "ad": "Jumbo Tuvalet Kağıdı", "birim": "TL/Rulo", "uretim_yeri": "İstanbul"}
+  {"id": "urun-001", "ad": "Beyaz Peçete 100'lü", "birim": "TL/Paket", "uretim_yeri": "Ankara", "fiyat": 24.90},
+  {"id": "urun-002", "ad": "Renkli Peçete 50'li", "birim": "TL/Paket", "uretim_yeri": "Ankara", "fiyat": 18.50},
+  {"id": "urun-003", "ad": "Kağıt Havlu 6'lı Rulo", "birim": "TL/Paket", "uretim_yeri": "İstanbul", "fiyat": 89.90},
+  {"id": "urun-004", "ad": "Islak Mendil 90'lı", "birim": "TL/Adet", "uretim_yeri": "Ankara", "fiyat": null},
+  {"id": "urun-005", "ad": "Tuvalet Kağıdı 32'li", "birim": "TL/Paket", "uretim_yeri": "İstanbul", "fiyat": 249.00},
+  {"id": "urun-006", "ad": "Endüstriyel Havlu 1kg", "birim": "TL/Rulo", "uretim_yeri": "Ankara", "fiyat": null},
+  {"id": "urun-007", "ad": "Masa Örtüsü 120x180", "birim": "TL/Adet", "uretim_yeri": "Bursa", "fiyat": 35.00},
+  {"id": "urun-008", "ad": "Peçete Dispenseri", "birim": "TL/Adet", "uretim_yeri": "İstanbul", "fiyat": null},
+  {"id": "urun-009", "ad": "Kağıt Havlu Tekli", "birim": "TL/Adet", "uretim_yeri": "Ankara", "fiyat": 16.75},
+  {"id": "urun-010", "ad": "Z Katlama Havlu 200'lü", "birim": "TL/Paket", "uretim_yeri": "Bursa", "fiyat": 42.00},
+  {"id": "urun-011", "ad": "Mini Peçete 250'li", "birim": "TL/Paket", "uretim_yeri": "Ankara", "fiyat": null},
+  {"id": "urun-012", "ad": "Jumbo Tuvalet Kağıdı", "birim": "TL/Rulo", "uretim_yeri": "İstanbul", "fiyat": 129.90}
 ]

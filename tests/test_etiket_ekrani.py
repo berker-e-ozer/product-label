@@ -23,6 +23,13 @@ class TestUrunler(unittest.TestCase):
         self.assertIn("birim", ilk)
         self.assertIn("uretim_yeri", ilk)
 
+    def test_fiyat_alani_sayi_veya_bos(self):
+        for urun in servis.urunleri_getir():
+            self.assertIn("fiyat", urun)
+            if urun["fiyat"] is not None:
+                self.assertIsInstance(urun["fiyat"], (int, float))
+                self.assertGreater(urun["fiyat"], 0)
+
     def test_urun_id_benzersiz(self):
         veri = servis.urunleri_getir()
         idler = [u["id"] for u in veri]

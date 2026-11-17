@@ -4,13 +4,21 @@ var urunler = [];
 var seciliIdler = new Set();
 var fiyatlar = {};
 var ayarlar = Object.assign({}, VARSAYILAN_AYARLAR);
-var olcek = 3;
+var olcek = 2;
+var aktifAdim = 1;
 var bildirimZamanlayici = null;
+
+var YAZI_ALANLARI = [
+  { anahtar: 'urun_adi', baslik: 'Ürün Adı' },
+  { anahtar: 'fiyat', baslik: 'Fiyat' },
+  { anahtar: 'birim', baslik: 'Birim' },
+  { anahtar: 'alt_metin', baslik: 'Alt Metin (Üretim Yeri & Tarih)' },
+];
 
 /* ── Yardimcilar ── */
 
 function kacir(metin) {
-  if (!metin) return '';
+  if (metin === null || metin === undefined) return '';
   var div = document.createElement('div');
   div.textContent = String(metin);
   return div.innerHTML;
@@ -18,30 +26,86 @@ function kacir(metin) {
 
 function bugunTarih() {
   var d = new Date();
-  var gun = ('0' + d.getDate()).slice(-2);
-  var ay = ('0' + (d.getMonth() + 1)).slice(-2);
-  return gun + '.' + ay + '.' + d.getFullYear();
+  return ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + '.' + d.getFullYear();
+}
+
+function fiyatSayi(deger) {
+  if (deger === null || deger === undefined || deger === '') return NaN;
+  return parseFloat(String(deger).replace(/\s/g, '').replace(',', '.'));
+}
+
+function fiyatBicimle(deger) {
+  var sayi = fiyatSayi(deger);
+  if (isNaN(sayi)) return '';
+  return sayi.toFixed(2).replace('.', ',');
+}
+
+function sistemFiyatiVar(urun) {
+  return urun.fiyat !== null && urun.fiyat !== undefined && !isNaN(fiyatSayi(urun.fiyat));
+}
+
+function urunBul(id) {
+  for (var i = 0; i < urunler.length; i++) if (urunler[i].id === id) return urunler[i];
+  return null;
+}
+
+function seciliUrunler() {
+  return urunler.filter(function(u) { return seciliIdler.has(u.id); });
+}
+
+function filtreliUrunler() {
+  var arama = document.getElementById('aramaInput').value.toLocaleLowerCase('tr');
+  return urunler.filter(function(u) {
+    if (!arama) return true;
+    return (u.ad + ' ' + u.birim + ' ' + u.uretim_yeri).toLocaleLowerCase('tr').indexOf(arama) > -1;
+  });
+}
+
+function eksikFiyatVar() {
+  var eksik = false;
+  seciliIdler.forEach(function(id) {
+    if (!(fiyatSayi(fiyatlar[id]) > 0)) eksik = true;
+  });
+  return eksik;
+}
+
+function butonMesgul(btn, mesgul, metin) {
+  if (mesgul) {
+    btn.dataset.eskiHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = '⏳ ' + metin;
+  } else {
+    btn.disabled = false;
+    if (btn.dataset.eskiHtml) btn.innerHTML = btn.dataset.eskiHtml;
+  }
+}
+
+function jsonIste(url, secenekler) {
+  return fetch(url, secenekler).then(function(r) {
+    return r.json().catch(function() { return {}; }).then(function(j) {
+      if (!r.ok || j.error) throw new Error(j.error || 'Sunucuya ulaşılamadı (' + r.status + ')');
+      return j;
+    });
+  });
 }
 
 /* ── Bildirim ── */
 
 function bildirimGoster(tip, baslik, metin) {
-  var el = document.getElementById('bildirim');
   var icerik = document.getElementById('bildirimIcerik');
   var ikon = document.getElementById('bildirimIkon');
   document.getElementById('bildirimBaslik').textContent = baslik;
   document.getElementById('bildirimMetin').textContent = metin;
 
-  icerik.className = 'rounded-lg shadow-lg px-4 py-3 flex items-start gap-3 ';
   if (tip === 'hata') {
-    icerik.className += 'bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200';
-    ikon.className = 'ph ph-warning-circle text-xl flex-shrink-0 mt-0.5 text-red-600 dark:text-red-400';
+    icerik.className = 'rounded-lg shadow-lg px-4 py-3 flex items-start gap-3 bg-red-50 dark:bg-red-950 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800';
+    ikon.className = 'ph ph-warning-circle text-xl shrink-0 mt-0.5 text-red-600 dark:text-red-400';
   } else {
-    icerik.className += 'bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200';
-    ikon.className = 'ph ph-check-circle text-xl flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400';
+    icerik.className = 'rounded-lg shadow-lg px-4 py-3 flex items-start gap-3 bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800';
+    ikon.className = 'ph ph-check-circle text-xl shrink-0 mt-0.5 text-green-600 dark:text-green-400';
   }
 
-  el.classList.remove('hidden');
+  document.getElementById('bildirim').classList.remove('hidden');
   if (bildirimZamanlayici) clearTimeout(bildirimZamanlayici);
   bildirimZamanlayici = setTimeout(bildirimKapat, 5000);
 }
@@ -54,40 +118,21 @@ function bildirimKapat() {
 /* ── Adim Yonetimi ── */
 
 function adimGit(no) {
-  if (no === 2 && seciliIdler.size === 0) {
-    bildirimGoster('hata', 'Uyarı', 'Önce en az bir ürün seçin');
+  if (no >= 2 && seciliIdler.size === 0) {
+    bildirimGoster('hata', 'Ürün seçilmedi', 'Devam etmek için en az bir ürün seçin.');
     return;
   }
-  if (no === 3) {
-    if (seciliIdler.size === 0) {
-      bildirimGoster('hata', 'Uyarı', 'Önce ürün seçin');
-      return;
-    }
-    var eksikFiyat = false;
-    seciliIdler.forEach(function(id) {
-      if (!fiyatlar[id] || fiyatlar[id] === '' || fiyatlar[id] === '0') eksikFiyat = true;
-    });
-    if (eksikFiyat) {
-      bildirimGoster('hata', 'Uyarı', 'Tüm seçili ürünlere fiyat girin');
-      return;
-    }
+  if (no === 3 && eksikFiyatVar()) {
+    if (aktifAdim !== 2) adimGit(2);
+    bildirimGoster('hata', 'Eksik fiyat', 'Seçili tüm ürünlere 0\'dan büyük bir fiyat girin.');
+    return;
   }
 
-  document.getElementById('adim1').classList.add('hidden');
-  document.getElementById('adim2').classList.add('hidden');
-  document.getElementById('adim3').classList.add('hidden');
-  document.getElementById('adim' + no).classList.remove('hidden');
-
-  var aktifCls = 'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap bg-blue-600 text-white';
-  var pasifCls = 'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
-  var tamamCls = 'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300';
-
+  aktifAdim = no;
   for (var i = 1; i <= 3; i++) {
-    var btn = document.getElementById('adimBtn' + i);
-    if (i === no) btn.className = aktifCls;
-    else if (i < no) btn.className = tamamCls;
-    else btn.className = pasifCls;
+    document.getElementById('adim' + i).classList.toggle('hidden', i !== no);
   }
+  adimGostergesiniGuncelle();
 
   if (no === 2) fiyatGirisiOlustur();
   if (no === 3) onizlemeyiGuncelle();
@@ -95,128 +140,165 @@ function adimGit(no) {
   window.scrollTo(0, 0);
 }
 
+function adimGostergesiniGuncelle() {
+  var temel = 'adim-btn w-full min-h-11 flex items-center justify-center gap-2 px-2 rounded-lg text-sm font-medium transition-colors duration-200 cursor-pointer ';
+  for (var i = 1; i <= 3; i++) {
+    var btn = document.getElementById('adimBtn' + i);
+    var no = btn.querySelector('.adim-no');
+    var noTemel = 'adim-no w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ';
+    if (i === aktifAdim) {
+      btn.className = temel + 'bg-blue-600 text-white';
+      no.className = noTemel + 'bg-white/25 text-white';
+      no.textContent = i;
+      btn.setAttribute('aria-current', 'step');
+    } else if (i < aktifAdim) {
+      btn.className = temel + 'bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900/50';
+      no.className = noTemel + 'bg-green-600 text-white';
+      no.innerHTML = '<i class="ph ph-check" aria-hidden="true"></i>';
+      btn.removeAttribute('aria-current');
+    } else {
+      btn.className = temel + 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700';
+      no.className = noTemel + 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200';
+      no.textContent = i;
+      btn.removeAttribute('aria-current');
+    }
+  }
+}
+
 /* ── Veri Yukleme ── */
 
 function urunleriYukle() {
-  showLoading('Ürünler yükleniyor...');
-  fetch('/api/etiket-ekrani/urunler')
-    .then(function(r) {
-      if (!r.ok) return r.json().then(function(j) { throw new Error(j.error || 'Sunucu hatası'); });
-      return r.json();
-    })
+  showLoading('Ürünler yükleniyor');
+  jsonIste('/api/etiket-ekrani/urunler')
     .then(function(veri) {
       urunler = veri;
+      urunler.forEach(function(u) {
+        if (sistemFiyatiVar(u) && fiyatlar[u.id] === undefined) fiyatlar[u.id] = fiyatBicimle(u.fiyat);
+      });
       urunListesiOlustur();
-      hideLoading();
     })
     .catch(function(e) {
-      hideLoading();
-      bildirimGoster('hata', 'Yükleme Hatası', e.message);
-    });
+      document.getElementById('urunListesi').innerHTML =
+        '<p class="py-8 text-center text-red-700 dark:text-red-300">Ürünler yüklenemedi. Sayfayı yenileyip tekrar deneyin.</p>';
+      bildirimGoster('hata', 'Yükleme hatası', e.message);
+    })
+    .finally(hideLoading);
 }
 
 function ayarlariYukle() {
-  fetch('/api/etiket-ekrani/ayarlar')
-    .then(function(r) { return r.json(); })
+  jsonIste('/api/etiket-ekrani/ayarlar')
     .then(function(veri) {
-      if (!veri.error) {
-        ayarlar = Object.assign({}, VARSAYILAN_AYARLAR, veri);
-        ayarPaneliDoldur();
-      }
+      ayarlar = Object.assign({}, VARSAYILAN_AYARLAR, veri);
+      ayarPaneliDoldur();
+      if (aktifAdim === 3) onizlemeyiGuncelle();
     })
-    .catch(function() {});
+    .catch(function(e) {
+      bildirimGoster('hata', 'Ayarlar okunamadı', e.message + ' Varsayılan ayarlar kullanılıyor.');
+    });
 }
 
 /* ── ADIM 1: Urun Listesi ── */
 
 function urunListesiOlustur() {
-  var arama = document.getElementById('aramaInput').value.toLowerCase();
-  var kapsayici = document.getElementById('urunListesi');
+  var filtreli = filtreliUrunler();
   var html = '';
 
-  var filtreli = urunler.filter(function(u) {
-    if (!arama) return true;
-    return (u.ad + ' ' + u.birim + ' ' + u.uretim_yeri).toLowerCase().indexOf(arama) > -1;
-  });
-
   if (filtreli.length === 0) {
-    html = '<div class="text-center py-8 text-gray-400">' +
-      (arama ? 'Aramayla eşleşen ürün bulunamadı' : 'Ürün bulunamadı') + '</div>';
-  } else {
-    for (var i = 0; i < filtreli.length; i++) {
-      var u = filtreli[i];
-      var secili = seciliIdler.has(u.id);
-      var bgCls = secili ? 'bg-blue-50 dark:bg-blue-900/20' : '';
-      html += '<label class="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors ' + bgCls + '">' +
-        '<input type="checkbox" data-urun-id="' + kacir(u.id) + '" ' + (secili ? 'checked' : '') +
-        ' class="urun-checkbox w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 flex-shrink-0">' +
-        '<div class="flex-1 min-w-0">' +
-        '<div class="font-medium text-gray-800 dark:text-gray-100 truncate">' + kacir(u.ad) + '</div>' +
-        '<div class="text-xs text-gray-500 dark:text-gray-400">' + kacir(u.birim) + ' · ' + kacir(u.uretim_yeri) + '</div>' +
-        '</div>' +
-        '</label>';
-    }
+    html = '<p class="py-8 text-center text-gray-500 dark:text-gray-400">' +
+      (urunler.length ? 'Aramayla eşleşen ürün bulunamadı' : 'Ürün bulunamadı') + '</p>';
   }
-  kapsayici.innerHTML = html;
+
+  for (var i = 0; i < filtreli.length; i++) {
+    var u = filtreli[i];
+    var secili = seciliIdler.has(u.id);
+    var fiyatRozet = sistemFiyatiVar(u)
+      ? '<span class="text-sm font-semibold text-gray-900 dark:text-gray-100 tabular-nums whitespace-nowrap">₺' + kacir(fiyatBicimle(u.fiyat)) + '</span>'
+      : '<span class="text-xs font-medium text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full whitespace-nowrap">Fiyat yok</span>';
+
+    html += '<label class="flex items-center gap-3 px-3 py-2.5 min-h-14 cursor-pointer transition-colors duration-150 ' +
+      (secili ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/40') + '">' +
+      '<input type="checkbox" data-urun-id="' + kacir(u.id) + '"' + (secili ? ' checked' : '') +
+      ' class="urun-checkbox w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 shrink-0">' +
+      '<span class="flex-1 min-w-0">' +
+      '<span class="block font-medium text-gray-900 dark:text-gray-100 truncate">' + kacir(u.ad) + '</span>' +
+      '<span class="block text-sm text-gray-600 dark:text-gray-400 truncate">' + kacir(u.birim) + ' · ' + kacir(u.uretim_yeri) + '</span>' +
+      '</span>' + fiyatRozet +
+      '</label>';
+  }
+  document.getElementById('urunListesi').innerHTML = html;
   secimSayisiniGuncelle();
 }
 
 function secimSayisiniGuncelle() {
-  document.getElementById('secimSayisi').textContent = seciliIdler.size + ' ürün seçili';
+  document.getElementById('secimSayisi').textContent = seciliIdler.size + ' seçili';
   document.getElementById('adim1Devam').disabled = seciliIdler.size === 0;
 
-  var tumunuSecKutu = document.getElementById('tumunuSecKutu');
-  if (urunler.length > 0 && seciliIdler.size === urunler.length) {
-    tumunuSecKutu.checked = true;
-    tumunuSecKutu.indeterminate = false;
-  } else if (seciliIdler.size > 0) {
-    tumunuSecKutu.checked = false;
-    tumunuSecKutu.indeterminate = true;
-  } else {
-    tumunuSecKutu.checked = false;
-    tumunuSecKutu.indeterminate = false;
-  }
+  var kutu = document.getElementById('tumunuSecKutu');
+  var filtreli = filtreliUrunler();
+  var seciliSayi = filtreli.filter(function(u) { return seciliIdler.has(u.id); }).length;
+  kutu.checked = filtreli.length > 0 && seciliSayi === filtreli.length;
+  kutu.indeterminate = seciliSayi > 0 && seciliSayi < filtreli.length;
 }
 
 /* ── ADIM 2: Fiyat Girisi ── */
 
 function fiyatGirisiOlustur() {
-  var kapsayici = document.getElementById('fiyatListesi');
   var html = '';
+  var liste = seciliUrunler();
 
-  var seciliUrunler = urunler.filter(function(u) { return seciliIdler.has(u.id); });
-
-  for (var i = 0; i < seciliUrunler.length; i++) {
-    var u = seciliUrunler[i];
-    var mevcutFiyat = fiyatlar[u.id] || '';
-    html += '<div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-900">' +
+  for (var i = 0; i < liste.length; i++) {
+    var u = liste[i];
+    var inputId = 'fiyat_' + i;
+    html += '<div data-satir="' + kacir(u.id) + '" class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">' +
       '<div class="flex-1 min-w-0">' +
-      '<div class="font-medium text-gray-800 dark:text-gray-100">' + kacir(u.ad) + '</div>' +
-      '<div class="text-xs text-gray-500 dark:text-gray-400">' + kacir(u.birim) + '</div>' +
+      '<label for="' + inputId + '" class="block font-medium text-gray-900 dark:text-gray-100">' + kacir(u.ad) + '</label>' +
+      '<span class="text-sm text-gray-600 dark:text-gray-400">' + kacir(u.birim) + '</span>' +
+      '<div class="fiyat-ipucu mt-1 text-sm"></div>' +
       '</div>' +
-      '<div class="flex items-center gap-2 w-full sm:w-auto">' +
-      '<span class="text-lg font-semibold text-gray-600 dark:text-gray-400">₺</span>' +
-      '<input type="number" step="0.01" min="0" placeholder="0,00" data-fiyat-id="' + kacir(u.id) + '" ' +
-      'value="' + kacir(mevcutFiyat) + '" ' +
-      'class="fiyat-input w-full sm:w-32 px-3 py-3 text-lg font-semibold text-right rounded-lg border border-gray-300 dark:border-gray-600 ' +
-      'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">' +
+      '<div class="relative w-full sm:w-40">' +
+      '<span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-semibold" aria-hidden="true">₺</span>' +
+      '<input type="text" inputmode="decimal" autocomplete="off" id="' + inputId + '" data-fiyat-id="' + kacir(u.id) + '" ' +
+      'value="' + kacir(fiyatlar[u.id] || '') + '" placeholder="0,00" ' +
+      'class="fiyat-input w-full min-h-12 pl-8 pr-3 text-lg font-semibold text-right tabular-nums rounded-lg border border-gray-300 dark:border-gray-600 ' +
+      'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">' +
       '</div>' +
       '</div>';
   }
 
+  var kapsayici = document.getElementById('fiyatListesi');
   kapsayici.innerHTML = html;
+  kapsayici.querySelectorAll('[data-satir]').forEach(fiyatIpucuGuncelle);
   fiyatDurumunuKontrolEt();
 
-  var ilkInput = kapsayici.querySelector('.fiyat-input');
-  if (ilkInput) setTimeout(function() { ilkInput.focus(); }, 100);
+  var ilkBos = Array.prototype.find.call(kapsayici.querySelectorAll('.fiyat-input'), function(el) { return !el.value; });
+  if (ilkBos) ilkBos.focus();
+}
+
+function fiyatIpucuGuncelle(satir) {
+  var urun = urunBul(satir.getAttribute('data-satir'));
+  var input = satir.querySelector('.fiyat-input');
+  var ipucu = satir.querySelector('.fiyat-ipucu');
+  var girilen = fiyatSayi(input.value);
+  var gecersiz = input.value !== '' && !(girilen > 0);
+
+  input.classList.toggle('border-red-500', gecersiz);
+  input.classList.toggle('dark:border-red-400', gecersiz);
+  input.setAttribute('aria-invalid', gecersiz ? 'true' : 'false');
+
+  if (gecersiz) {
+    ipucu.innerHTML = '<span class="text-red-700 dark:text-red-300">Geçerli bir fiyat girin (ör. 24,90)</span>';
+  } else if (!sistemFiyatiVar(urun)) {
+    ipucu.innerHTML = '<span class="text-amber-800 dark:text-amber-200">Sistemde fiyat yok, elle girin</span>';
+  } else if (Math.abs(girilen - fiyatSayi(urun.fiyat)) < 0.005) {
+    ipucu.innerHTML = '<span class="text-gray-600 dark:text-gray-400"><i class="ph ph-database mr-1" aria-hidden="true"></i>Sistem fiyatı</span>';
+  } else {
+    ipucu.innerHTML = '<span class="text-blue-700 dark:text-blue-300">Değiştirildi · sistemde ₺' + kacir(fiyatBicimle(urun.fiyat)) + '</span> ' +
+      '<button type="button" class="fiyat-geri ml-1 min-h-11 px-2 -my-3 text-blue-700 dark:text-blue-300 underline underline-offset-2 cursor-pointer">Sistem fiyatına dön</button>';
+  }
 }
 
 function fiyatDurumunuKontrolEt() {
-  var hepsiDolu = true;
-  seciliIdler.forEach(function(id) {
-    if (!fiyatlar[id] || fiyatlar[id] === '' || Number(fiyatlar[id]) <= 0) hepsiDolu = false;
-  });
-  document.getElementById('adim2Devam').disabled = !hepsiDolu;
+  document.getElementById('adim2Devam').disabled = eksikFiyatVar();
 }
 
 /* ── ADIM 3: Onizleme ── */
@@ -224,73 +306,64 @@ function fiyatDurumunuKontrolEt() {
 function onizlemeyiGuncelle() {
   var kapsayici = document.getElementById('etiketOnizleme');
   kapsayici.innerHTML = '';
-
-  var seciliUrunler = urunler.filter(function(u) { return seciliIdler.has(u.id); });
-  document.getElementById('etiketSayisi').textContent = seciliUrunler.length;
+  var liste = seciliUrunler();
+  document.getElementById('etiketSayisi').textContent = liste.length;
   document.getElementById('yakinlastirmaDeger').textContent = Math.round(olcek * 100) + '%';
 
-  for (var i = 0; i < seciliUrunler.length; i++) {
-    var u = seciliUrunler[i];
-    kapsayici.appendChild(etiketOlustur(u, fiyatlar[u.id], olcek));
+  for (var i = 0; i < liste.length; i++) {
+    var etiket = etiketOlustur(liste[i], fiyatlar[liste[i].id], olcek);
+    etiket.classList.add('shadow-sm', 'ring-1', 'ring-gray-300', 'dark:ring-gray-600');
+    kapsayici.appendChild(etiket);
   }
 }
 
 function etiketOlustur(urun, fiyat, s) {
-  var genislik = ayarlar.etiket_genislik;
-  var yukseklik = ayarlar.etiket_yukseklik;
-  var ic = ayarlar.ic_bosluk;
-
   var div = document.createElement('div');
-  div.className = 'etiket-kutu bg-white border border-gray-300 dark:border-gray-500 flex flex-col justify-between';
-  div.style.cssText = 'width:' + (genislik * s) + 'mm;height:' + (yukseklik * s) + 'mm;padding:' + (ic * s) + 'mm;page-break-inside:avoid;box-sizing:border-box;color:#000;background:#fff;';
+  div.className = 'etiket-kutu bg-white text-black flex flex-col justify-between overflow-hidden shrink-0';
+  div.style.width = (ayarlar.etiket_genislik * s) + 'mm';
+  div.style.height = (ayarlar.etiket_yukseklik * s) + 'mm';
+  div.style.padding = (ayarlar.ic_bosluk * s) + 'mm';
+  div.style.margin = (ayarlar.dis_bosluk * s) + 'mm';
+  div.style.boxSizing = 'border-box';
+  div.style.pageBreakInside = 'avoid';
 
   var urunAdi = document.createElement('div');
   urunAdi.style.cssText = yaziStili('urun_adi', s) + 'text-align:center;line-height:1.2;';
   urunAdi.textContent = urun.ad;
 
-  var fiyatDiv = document.createElement('div');
-  fiyatDiv.style.cssText = 'text-align:center;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+  var orta = document.createElement('div');
+  orta.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;';
 
   var fiyatYazi = document.createElement('div');
   fiyatYazi.style.cssText = yaziStili('fiyat', s) + 'line-height:1;';
   fiyatYazi.textContent = '₺' + fiyatBicimle(fiyat);
 
   var birimYazi = document.createElement('div');
-  birimYazi.style.cssText = yaziStili('birim', s) + 'line-height:1.3;margin-top:' + (1 * s) + 'mm;';
+  birimYazi.style.cssText = yaziStili('birim', s) + 'line-height:1.3;margin-top:' + s + 'mm;';
   birimYazi.textContent = urun.birim;
 
-  fiyatDiv.appendChild(fiyatYazi);
-  fiyatDiv.appendChild(birimYazi);
+  orta.appendChild(fiyatYazi);
+  orta.appendChild(birimYazi);
 
-  var altBlok = document.createElement('div');
-  altBlok.style.cssText = yaziStili('alt_metin', s) + 'text-align:center;line-height:1.3;';
-
-  var uretimYer = document.createElement('div');
-  uretimYer.textContent = urun.uretim_yeri;
-
-  var tarihEl = document.createElement('div');
-  tarihEl.textContent = bugunTarih();
-
-  altBlok.appendChild(uretimYer);
-  altBlok.appendChild(tarihEl);
+  var alt = document.createElement('div');
+  alt.style.cssText = yaziStili('alt_metin', s) + 'text-align:center;line-height:1.3;';
+  var yer = document.createElement('div');
+  yer.textContent = urun.uretim_yeri;
+  var tarih = document.createElement('div');
+  tarih.textContent = bugunTarih();
+  alt.appendChild(yer);
+  alt.appendChild(tarih);
 
   div.appendChild(urunAdi);
-  div.appendChild(fiyatDiv);
-  div.appendChild(altBlok);
-
+  div.appendChild(orta);
+  div.appendChild(alt);
   return div;
 }
 
 function yaziStili(alan, s) {
-  return 'font-family:' + ayarlar[alan + '_yazi_tipi'] + ';' +
+  return 'font-family:"' + ayarlar[alan + '_yazi_tipi'] + '",sans-serif;' +
     'font-size:' + (ayarlar[alan + '_boyut'] * s) + 'px;' +
     'font-weight:' + (ayarlar[alan + '_kalin'] ? 'bold' : 'normal') + ';';
-}
-
-function fiyatBicimle(deger) {
-  var sayi = parseFloat(deger);
-  if (isNaN(sayi)) return '0,00';
-  return sayi.toFixed(2).replace('.', ',');
 }
 
 function yakinlastir(delta) {
@@ -300,254 +373,187 @@ function yakinlastir(delta) {
 
 /* ── Ayarlar ── */
 
-var YAZI_ALANLARI = [
-  { anahtar: 'urun_adi', baslik: 'Ürün Adı' },
-  { anahtar: 'fiyat', baslik: 'Fiyat' },
-  { anahtar: 'birim', baslik: 'Birim' },
-  { anahtar: 'alt_metin', baslik: 'Alt Metin (Üretim Yeri & Tarih)' },
-];
-
 function ayarPaneliniOlustur() {
-  var kapsayici = document.getElementById('yaziAyarlariKapsayici');
-  var html = '';
+  var secenekler = YAZI_TIPLERI.map(function(yt) {
+    return '<option value="' + kacir(yt) + '">' + kacir(yt) + '</option>';
+  }).join('');
+  var girdi = 'w-full min-h-11 px-3 text-base rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none';
 
-  for (var i = 0; i < YAZI_ALANLARI.length; i++) {
-    var alan = YAZI_ALANLARI[i];
+  var html = '';
+  YAZI_ALANLARI.forEach(function(alan) {
     var k = alan.anahtar;
-    html += '<div class="pt-3 border-t border-gray-200 dark:border-gray-700">' +
-      '<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">' + alan.baslik + '</h3>' +
-      '<div class="grid grid-cols-3 gap-3">' +
-      '<div>' +
-      '<label class="text-xs text-gray-500 dark:text-gray-400">Yazı Tipi</label>' +
-      '<select id="ayar_' + k + '_yazi_tipi" class="ayar-input w-full px-3 py-2 text-base rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">' +
-      yaziTipiSecenekleri() +
-      '</select>' +
+    html += '<fieldset class="pt-4 border-t border-gray-200 dark:border-gray-700">' +
+      '<legend class="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-2">' + alan.baslik + '</legend>' +
+      '<div class="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-2">' +
+      '<div><label for="ayar_' + k + '_yazi_tipi" class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Yazı tipi</label>' +
+      '<select id="ayar_' + k + '_yazi_tipi" class="ayar-input ' + girdi + '">' + secenekler + '</select></div>' +
+      '<div><label for="ayar_' + k + '_boyut" class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Boyut (px)</label>' +
+      '<input type="number" inputmode="numeric" min="6" max="72" id="ayar_' + k + '_boyut" class="ayar-input ' + girdi + '"></div>' +
       '</div>' +
-      '<div>' +
-      '<label class="text-xs text-gray-500 dark:text-gray-400">Boyut (px)</label>' +
-      '<input type="number" min="6" max="72" id="ayar_' + k + '_boyut" class="ayar-input w-full px-3 py-2 text-base rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">' +
-      '</div>' +
-      '<div class="flex items-end pb-1">' +
-      '<label class="flex items-center gap-2 cursor-pointer">' +
-      '<input type="checkbox" id="ayar_' + k + '_kalin" class="ayar-checkbox w-5 h-5 text-blue-600 rounded focus:ring-blue-500">' +
-      '<span class="text-sm text-gray-700 dark:text-gray-300">Kalın</span>' +
-      '</label>' +
-      '</div>' +
-      '</div>' +
-      '</div>';
-  }
-  kapsayici.innerHTML = html;
-}
-
-function yaziTipiSecenekleri() {
-  var html = '';
-  for (var i = 0; i < YAZI_TIPLERI.length; i++) {
-    html += '<option value="' + kacir(YAZI_TIPLERI[i]) + '">' + kacir(YAZI_TIPLERI[i]) + '</option>';
-  }
-  return html;
+      '<label class="inline-flex items-center gap-2 min-h-11 cursor-pointer">' +
+      '<input type="checkbox" id="ayar_' + k + '_kalin" class="ayar-input w-5 h-5 rounded text-blue-600 focus:ring-blue-500">' +
+      '<span class="text-sm text-gray-800 dark:text-gray-200">Kalın</span></label>' +
+      '</fieldset>';
+  });
+  document.getElementById('yaziAyarlariKapsayici').innerHTML = html;
 }
 
 function ayarPaneliDoldur() {
-  var inputlar = document.querySelectorAll('.ayar-input');
-  for (var i = 0; i < inputlar.length; i++) {
-    var el = inputlar[i];
+  document.querySelectorAll('.ayar-input').forEach(function(el) {
     var anahtar = el.id.replace('ayar_', '');
-    if (anahtar && ayarlar[anahtar] !== undefined) {
-      el.value = ayarlar[anahtar];
-    }
-  }
-  var checklar = document.querySelectorAll('.ayar-checkbox');
-  for (var j = 0; j < checklar.length; j++) {
-    var cb = checklar[j];
-    var cbAnahtar = cb.id.replace('ayar_', '');
-    if (cbAnahtar && ayarlar[cbAnahtar] !== undefined) {
-      cb.checked = ayarlar[cbAnahtar];
-    }
-  }
+    if (ayarlar[anahtar] === undefined) return;
+    if (el.type === 'checkbox') el.checked = !!ayarlar[anahtar];
+    else el.value = ayarlar[anahtar];
+  });
 }
 
-function ayarDegisti(e) {
-  var el = e.target;
-  if (!el.id || !el.id.startsWith('ayar_')) return;
+function ayarDegisti(el) {
   var anahtar = el.id.replace('ayar_', '');
-
-  if (el.type === 'checkbox') {
-    ayarlar[anahtar] = el.checked;
-  } else if (el.type === 'number') {
+  if (el.type === 'checkbox') ayarlar[anahtar] = el.checked;
+  else if (el.type === 'number') {
+    if (el.value === '' || isNaN(Number(el.value))) return;
     ayarlar[anahtar] = Number(el.value);
-  } else {
-    ayarlar[anahtar] = el.value;
-  }
-
-  if (!document.getElementById('adim3').classList.contains('hidden')) {
-    onizlemeyiGuncelle();
-  }
+  } else ayarlar[anahtar] = el.value;
+  if (aktifAdim === 3) onizlemeyiGuncelle();
 }
 
 function ayarlariKaydet() {
-  showLoading('Ayarlar kaydediliyor...');
-  fetch('/api/etiket-ekrani/ayarlar', {
+  var btn = document.getElementById('kaydetBtn');
+  butonMesgul(btn, true, 'Kaydediliyor...');
+  showLoading('Ayarlar kaydediliyor');
+  return jsonIste('/api/etiket-ekrani/ayarlar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(ayarlar),
   })
-    .then(function(r) { return r.json(); })
-    .then(function(veri) {
-      hideLoading();
-      if (veri.ok) bildirimGoster('basarili', 'Kaydedildi', 'Ayarlar başarıyla kaydedildi');
-      else bildirimGoster('hata', 'Hata', veri.error || 'Kaydetme hatası');
-    })
-    .catch(function(e) {
-      hideLoading();
-      bildirimGoster('hata', 'Hata', e.message);
-    });
+    .then(function() { bildirimGoster('basarili', 'Kaydedildi', 'Etiket ayarları kaydedildi.'); })
+    .catch(function(e) { bildirimGoster('hata', 'Ayarlar kaydedilemedi', e.message); })
+    .finally(function() { hideLoading(); butonMesgul(btn, false); });
 }
 
 function ayarlariSifirla() {
   ayarlar = Object.assign({}, VARSAYILAN_AYARLAR);
   ayarPaneliDoldur();
+  onizlemeyiGuncelle();
   ayarlariKaydet();
-  if (!document.getElementById('adim3').classList.contains('hidden')) {
-    onizlemeyiGuncelle();
-  }
 }
 
 /* ── Yazdirma ── */
 
 function yazdir() {
-  var btn = document.getElementById('yazdirBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Hazırlanıyor...';
-
-  var seciliUrunler = urunler.filter(function(u) { return seciliIdler.has(u.id); });
-  if (seciliUrunler.length === 0) {
-    bildirimGoster('hata', 'Hata', 'Yazdırmak için ürün seçin');
-    btn.disabled = false;
-    btn.innerHTML = '<i class="ph ph-printer mr-1"></i>Tarayıcıdan Yazdır';
+  var liste = seciliUrunler();
+  if (liste.length === 0) {
+    bildirimGoster('hata', 'Ürün yok', 'Yazdırmak için ürün seçin.');
     return;
   }
+  var btn = document.getElementById('yazdirBtn');
+  butonMesgul(btn, true, 'Hazırlanıyor...');
 
   var alan = document.getElementById('yazdirAlani');
   alan.innerHTML = '';
-
-  for (var i = 0; i < seciliUrunler.length; i++) {
-    var etiket = etiketOlustur(seciliUrunler[i], fiyatlar[seciliUrunler[i].id], 1);
-    etiket.style.width = ayarlar.etiket_genislik + 'mm';
-    etiket.style.height = ayarlar.etiket_yukseklik + 'mm';
-    etiket.style.padding = ayarlar.ic_bosluk + 'mm';
+  liste.forEach(function(u) {
+    var etiket = etiketOlustur(u, fiyatlar[u.id], 1);
     etiket.style.pageBreakAfter = 'always';
-    etiket.style.border = 'none';
     etiket.style.margin = '0';
     alan.appendChild(etiket);
-  }
+  });
 
   var stil = document.createElement('style');
   stil.id = 'yazdir-stili';
-  stil.textContent = '@media print { @page { size: ' + ayarlar.etiket_genislik + 'mm ' + ayarlar.etiket_yukseklik + 'mm; margin: 0; } ' +
-    'body { margin: 0; padding: 0; } ' +
-    '#yazdirAlani { display: block !important; } ' +
-    '.etiket-kutu { border: none !important; margin: 0 !important; } }';
+  stil.textContent = '@media print { @page { size: ' + ayarlar.etiket_genislik + 'mm ' + ayarlar.etiket_yukseklik + 'mm; margin: ' + ayarlar.dis_bosluk + 'mm; } ' +
+    'body { margin: 0; padding: 0; background: #fff; } header, nav, .no-print { display: none !important; } main { padding: 0 !important; margin: 0 !important; } ' +
+    '#adim3 { display: block !important; } #yazdirAlani { display: block !important; } }';
   document.head.appendChild(stil);
-
   alan.classList.remove('hidden');
 
   setTimeout(function() {
     window.print();
     alan.classList.add('hidden');
-    var eskiStil = document.getElementById('yazdir-stili');
-    if (eskiStil) eskiStil.remove();
-    btn.disabled = false;
-    btn.innerHTML = '<i class="ph ph-printer mr-1"></i>Tarayıcıdan Yazdır';
+    alan.innerHTML = '';
+    stil.remove();
+    butonMesgul(btn, false);
   }, 200);
 }
 
 function basimGonder() {
-  var btn = document.getElementById('basimBtn');
-  var seciliUrunler = urunler.filter(function(u) { return seciliIdler.has(u.id); });
-  if (seciliUrunler.length === 0) {
-    bildirimGoster('hata', 'Hata', 'Göndermek için ürün seçin');
+  var liste = seciliUrunler();
+  if (liste.length === 0) {
+    bildirimGoster('hata', 'Ürün yok', 'Göndermek için ürün seçin.');
     return;
   }
+  var btn = document.getElementById('basimBtn');
+  butonMesgul(btn, true, 'Gönderiliyor...');
+  showLoading('Etiketler yazıcıya gönderiliyor');
 
-  btn.disabled = true;
-  btn.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Gönderiliyor...';
-  showLoading('Etiketler yazıcıya gönderiliyor...');
-
-  var etiketler = seciliUrunler.map(function(u) {
-    return { id: u.id, ad: u.ad, fiyat: fiyatlar[u.id] || '0' };
+  var etiketler = liste.map(function(u) {
+    return { id: u.id, ad: u.ad, fiyat: fiyatBicimle(fiyatlar[u.id]) };
   });
 
-  fetch('/api/etiket-ekrani/bas', {
+  jsonIste('/api/etiket-ekrani/bas', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ etiketler: etiketler }),
   })
-    .then(function(r) {
-      if (!r.ok) return r.json().then(function(j) { throw new Error(j.error || 'Sunucu hatası'); });
-      return r.json();
-    })
-    .then(function(veri) {
-      hideLoading();
-      bildirimGoster('basarili', 'Gönderildi', veri.mesaj);
-    })
-    .catch(function(e) {
-      hideLoading();
-      bildirimGoster('hata', 'Gönderim Hatası', e.message);
-    })
-    .finally(function() {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="ph ph-paper-plane-tilt mr-1"></i>Yazıcıya Gönder';
-    });
+    .then(function(veri) { bildirimGoster('basarili', 'Gönderildi', veri.mesaj); })
+    .catch(function(e) { bildirimGoster('hata', 'Gönderilemedi', e.message); })
+    .finally(function() { hideLoading(); butonMesgul(btn, false); });
 }
 
 /* ── Olay Dinleyiciler ── */
 
 document.addEventListener('DOMContentLoaded', function() {
+  adimGostergesiniGuncelle();
   ayarPaneliniOlustur();
+  ayarPaneliDoldur();
   urunleriYukle();
   ayarlariYukle();
 
-  document.getElementById('aramaInput').addEventListener('input', function() {
-    urunListesiOlustur();
-  });
+  document.getElementById('aramaInput').addEventListener('input', urunListesiOlustur);
 
   document.getElementById('tumunuSecKutu').addEventListener('change', function() {
-    var arama = document.getElementById('aramaInput').value.toLowerCase();
-    var filtreli = urunler.filter(function(u) {
-      if (!arama) return true;
-      return (u.ad + ' ' + u.birim + ' ' + u.uretim_yeri).toLowerCase().indexOf(arama) > -1;
+    var secilsin = this.checked;
+    filtreliUrunler().forEach(function(u) {
+      if (secilsin) seciliIdler.add(u.id); else seciliIdler.delete(u.id);
     });
-
-    if (this.checked) {
-      filtreli.forEach(function(u) { seciliIdler.add(u.id); });
-    } else {
-      filtreli.forEach(function(u) { seciliIdler.delete(u.id); });
-    }
     urunListesiOlustur();
   });
 
   document.addEventListener('change', function(e) {
-    if (e.target.classList.contains('urun-checkbox')) {
-      var id = e.target.getAttribute('data-urun-id');
-      if (e.target.checked) seciliIdler.add(id);
-      else seciliIdler.delete(id);
+    var el = e.target;
+    if (el.classList.contains('urun-checkbox')) {
+      var id = el.getAttribute('data-urun-id');
+      if (el.checked) seciliIdler.add(id); else seciliIdler.delete(id);
       urunListesiOlustur();
-    }
-
-    if (e.target.classList.contains('ayar-input') || e.target.classList.contains('ayar-checkbox')) {
-      ayarDegisti(e);
+    } else if (el.classList.contains('ayar-input')) {
+      ayarDegisti(el);
+    } else if (el.classList.contains('fiyat-input') && fiyatSayi(el.value) > 0) {
+      el.value = fiyatBicimle(el.value);
+      fiyatlar[el.getAttribute('data-fiyat-id')] = el.value;
+      fiyatIpucuGuncelle(el.closest('[data-satir]'));
     }
   });
 
   document.addEventListener('input', function(e) {
-    if (e.target.classList.contains('fiyat-input')) {
-      var id = e.target.getAttribute('data-fiyat-id');
-      fiyatlar[id] = e.target.value;
+    var el = e.target;
+    if (el.classList.contains('fiyat-input')) {
+      fiyatlar[el.getAttribute('data-fiyat-id')] = el.value;
+      fiyatIpucuGuncelle(el.closest('[data-satir]'));
       fiyatDurumunuKontrolEt();
+    } else if (el.classList.contains('ayar-input') && el.type === 'number') {
+      ayarDegisti(el);
     }
+  });
 
-    if (e.target.classList.contains('ayar-input') && e.target.type === 'number') {
-      ayarDegisti(e);
-    }
+  document.addEventListener('click', function(e) {
+    var geri = e.target.closest('.fiyat-geri');
+    if (!geri) return;
+    var satir = geri.closest('[data-satir]');
+    var urun = urunBul(satir.getAttribute('data-satir'));
+    var input = satir.querySelector('.fiyat-input');
+    input.value = fiyatBicimle(urun.fiyat);
+    fiyatlar[urun.id] = input.value;
+    fiyatIpucuGuncelle(satir);
+    fiyatDurumunuKontrolEt();
+    input.focus();
   });
 });

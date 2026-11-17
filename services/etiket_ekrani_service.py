@@ -71,7 +71,8 @@ def init_schema():
 
 
 def urunleri_getir():
-    """Urun listesini dondurur.
+    """Urun listesini dondurur: [{"id", "ad", "birim", "uretim_yeri", "fiyat"}].
+    fiyat sistemde yoksa None olabilir; ekranda elle girilir.
     Gelistirmede sahte_veri.json'dan okur.
     Alp gercek sisteme baglarken bu fonksiyonu degistirecek.
     """

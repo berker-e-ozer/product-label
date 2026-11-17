@@ -2,7 +2,19 @@
 
 Ürün fiyat etiketi oluşturup bastırmaya yarayan Flask modülü.
 
-Akış: Ürün seç → Fiyat gir → Etiket önizle & yazdır
+Akış: Ürün seç → Fiyatı kontrol et / gir → Etiket önizle, yazı ayarlarını yap, yazdır
+
+- Ürünün sistemde fiyatı varsa fiyat kutusu dolu gelir, istenirse değiştirilir ("Sistem fiyatına dön" ile geri alınır).
+- Fiyatı olmayan ürünlerde fiyat elle girilir; tüm fiyatlar girilmeden önizlemeye geçilmez.
+- Önizleme ekranında etiket boyutu, boşluklar ve her alan için yazı tipi / boyut / kalınlık ayarlanır, önizleme anında güncellenir.
+
+### Ürün verisi biçimi
+
+```json
+{"id": "urun-001", "ad": "Beyaz Peçete 100'lü", "birim": "TL/Paket", "uretim_yeri": "Ankara", "fiyat": 24.90}
+```
+
+`fiyat` sayı ya da `null` (sistemde fiyat yoksa).
 
 ## Kurulum
 
