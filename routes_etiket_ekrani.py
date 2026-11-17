@@ -63,7 +63,13 @@ def bas():
 
         sonuclar = []
         for et in etiketler:
-            sonuc = etiket_bas(et.get("id", ""), et.get("ad", ""), et.get("fiyat", ""))
+            sonuc = etiket_bas(
+                et.get("id", ""),
+                et.get("ad", ""),
+                et.get("fiyat", ""),
+                et.get("birim", ""),
+                et.get("fiyat_tarihi", ""),
+            )
             sonuclar.append(sonuc)
 
         return jsonify({

@@ -30,6 +30,12 @@ class TestUrunler(unittest.TestCase):
                 self.assertIsInstance(urun["fiyat"], (int, float))
                 self.assertGreater(urun["fiyat"], 0)
 
+    def test_fiyat_tarihi_iso_veya_bos(self):
+        import datetime
+        for urun in servis.urunleri_getir():
+            if urun.get("fiyat_tarihi"):
+                datetime.date.fromisoformat(urun["fiyat_tarihi"])
+
     def test_urun_id_benzersiz(self):
         veri = servis.urunleri_getir()
         idler = [u["id"] for u in veri]
@@ -82,6 +88,20 @@ class TestEtiketBas(unittest.TestCase):
     def test_basim_stub(self):
         sonuc = servis.etiket_bas("urun-001", "Beyaz Pecete 100lu", "24.90")
         self.assertTrue(sonuc["ok"])
+
+    def test_init_schema_tekrar_calisabilir(self):
+        servis.init_schema()
+        servis.init_schema()
+
+    def test_basim_birim_ve_tarih_kaydedilir(self):
+        servis.etiket_bas("urun-033", "YESIL KARABIBER", "300,00", "TL/100g", "02.07.2026")
+        baglanti = servis._db_baglan()
+        try:
+            satir = baglanti.execute("SELECT birim, fiyat_tarihi FROM etiket_basim_log").fetchone()
+            self.assertEqual(satir["birim"], "TL/100g")
+            self.assertEqual(satir["fiyat_tarihi"], "02.07.2026")
+        finally:
+            baglanti.close()
 
     def test_basim_log(self):
         servis.etiket_bas("urun-001", "Beyaz Pecete 100lu", "24.90")

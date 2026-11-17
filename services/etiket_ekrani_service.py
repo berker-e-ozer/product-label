@@ -65,14 +65,20 @@ def init_schema():
                 zaman TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             )
         """)
+        for kolon in ("birim TEXT", "fiyat_tarihi TEXT"):
+            try:
+                baglanti.execute(f"ALTER TABLE etiket_basim_log ADD COLUMN {kolon}")
+            except sqlite3.OperationalError as hata:
+                if "duplicate column" not in str(hata):
+                    raise
         baglanti.commit()
     finally:
         baglanti.close()
 
 
 def urunleri_getir():
-    """Urun listesini dondurur: [{"id", "ad", "birim", "uretim_yeri", "fiyat"}].
-    fiyat sistemde yoksa None olabilir; ekranda elle girilir.
+    """Urun listesini dondurur: [{"id", "ad", "birim", "uretim_yeri", "fiyat", "fiyat_tarihi"}].
+    fiyat ve fiyat_tarihi (YYYY-AA-GG) sistemde yoksa None olabilir; ekranda elle girilir.
     Gelistirmede sahte_veri.json'dan okur.
     Alp gercek sisteme baglarken bu fonksiyonu degistirecek.
     """
@@ -116,7 +122,7 @@ def ayarlari_kaydet(kullanici="test", ayarlar=None):
         baglanti.close()
 
 
-def etiket_bas(urun_id, urun_adi, fiyat):
+def etiket_bas(urun_id, urun_adi, fiyat, birim="", fiyat_tarihi=""):
     """Yaziciya etiket basim komutu gonderir.
     Simdilik log'a yazar; Alp gercek yazici baglantisini yapacak.
     """
@@ -124,10 +130,11 @@ def etiket_bas(urun_id, urun_adi, fiyat):
     try:
         baglanti.execute(
             """
-            INSERT INTO etiket_basim_log (urun_id, urun_adi, fiyat, kullanici, durum, zaman)
-            VALUES (?, ?, ?, 'test', 'gonderildi', datetime('now', 'localtime'))
+            INSERT INTO etiket_basim_log
+                (urun_id, urun_adi, fiyat, birim, fiyat_tarihi, kullanici, durum, zaman)
+            VALUES (?, ?, ?, ?, ?, 'test', 'gonderildi', datetime('now', 'localtime'))
             """,
-            (urun_id, urun_adi, fiyat),
+            (urun_id, urun_adi, fiyat, birim, fiyat_tarihi),
         )
         baglanti.commit()
     finally:

@@ -3,6 +3,7 @@
 var urunler = [];
 var seciliIdler = new Set();
 var fiyatlar = {};
+var birimler = {};
 var ayarlar = Object.assign({}, VARSAYILAN_AYARLAR);
 var olcek = 2;
 var aktifAdim = 1;
@@ -24,9 +25,39 @@ function kacir(metin) {
   return div.innerHTML;
 }
 
+var VARSAYILAN_BIRIMLER = ['TL/kg', 'TL/500g', 'TL/250g', 'TL/100g', 'TL/Adet', 'TL/Paket'];
+
 function bugunTarih() {
   var d = new Date();
   return ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + '.' + d.getFullYear();
+}
+
+function tarihBicimle(iso) {
+  var p = String(iso || '').split('-');
+  return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : '';
+}
+
+function fiyatSistemdenFarkli(urun) {
+  if (!sistemFiyatiVar(urun)) return true;
+  return Math.abs(fiyatSayi(fiyatlar[urun.id]) - fiyatSayi(urun.fiyat)) >= 0.005;
+}
+
+function birimSistemdenFarkli(urun) {
+  return (birimler[urun.id] || '').trim() !== (urun.birim || '').trim();
+}
+
+/* Fiyat degistiyse etikete bugunun tarihi, degismediyse sistemdeki fiyat degisiklik tarihi basilir */
+function etiketTarihi(urun) {
+  if (fiyatSistemdenFarkli(urun) || !urun.fiyat_tarihi) return bugunTarih();
+  return tarihBicimle(urun.fiyat_tarihi);
+}
+
+function birimSecenekleriniDoldur() {
+  var hepsi = VARSAYILAN_BIRIMLER.slice();
+  urunler.forEach(function(u) { if (u.birim && hepsi.indexOf(u.birim) === -1) hepsi.push(u.birim); });
+  document.getElementById('birimSecenekleri').innerHTML = hepsi.map(function(b) {
+    return '<option value="' + kacir(b) + '"></option>';
+  }).join('');
 }
 
 function fiyatSayi(deger) {
@@ -174,7 +205,9 @@ function urunleriYukle() {
       urunler = veri;
       urunler.forEach(function(u) {
         if (sistemFiyatiVar(u) && fiyatlar[u.id] === undefined) fiyatlar[u.id] = fiyatBicimle(u.fiyat);
+        if (birimler[u.id] === undefined) birimler[u.id] = u.birim || '';
       });
+      birimSecenekleriniDoldur();
       urunListesiOlustur();
     })
     .catch(function(e) {
@@ -248,20 +281,28 @@ function fiyatGirisiOlustur() {
 
   for (var i = 0; i < liste.length; i++) {
     var u = liste[i];
-    var inputId = 'fiyat_' + i;
-    html += '<div data-satir="' + kacir(u.id) + '" class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">' +
-      '<div class="flex-1 min-w-0">' +
-      '<label for="' + inputId + '" class="block font-medium text-gray-900 dark:text-gray-100">' + kacir(u.ad) + '</label>' +
-      '<span class="text-sm text-gray-600 dark:text-gray-400">' + kacir(u.birim) + '</span>' +
-      '<div class="fiyat-ipucu mt-1 text-sm"></div>' +
-      '</div>' +
-      '<div class="relative w-full sm:w-40">' +
+    var fiyatId = 'fiyat_' + i;
+    var birimId = 'birim_' + i;
+    html += '<div data-satir="' + kacir(u.id) + '" class="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">' +
+      '<div class="font-medium text-gray-900 dark:text-gray-100">' + kacir(u.ad) + '</div>' +
+      '<div class="text-sm text-gray-600 dark:text-gray-400">' + kacir(u.uretim_yeri) +
+      (u.fiyat_tarihi ? ' · Son fiyat değişikliği ' + kacir(tarihBicimle(u.fiyat_tarihi)) : '') + '</div>' +
+      '<div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:grid-cols-[10rem_10rem] gap-2 mt-2">' +
+      '<div><label for="' + fiyatId + '" class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Fiyat</label>' +
+      '<div class="relative">' +
       '<span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-semibold" aria-hidden="true">₺</span>' +
-      '<input type="text" inputmode="decimal" autocomplete="off" id="' + inputId + '" data-fiyat-id="' + kacir(u.id) + '" ' +
+      '<input type="text" inputmode="decimal" autocomplete="off" id="' + fiyatId + '" data-fiyat-id="' + kacir(u.id) + '" ' +
       'value="' + kacir(fiyatlar[u.id] || '') + '" placeholder="0,00" ' +
       'class="fiyat-input w-full min-h-12 pl-8 pr-3 text-lg font-semibold text-right tabular-nums rounded-lg border border-gray-300 dark:border-gray-600 ' +
       'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">' +
+      '</div></div>' +
+      '<div><label for="' + birimId + '" class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Birim</label>' +
+      '<input type="text" list="birimSecenekleri" autocomplete="off" id="' + birimId + '" data-birim-id="' + kacir(u.id) + '" ' +
+      'value="' + kacir(birimler[u.id] || '') + '" placeholder="TL/kg" ' +
+      'class="birim-input w-full min-h-12 px-3 text-base rounded-lg border border-gray-300 dark:border-gray-600 ' +
+      'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"></div>' +
       '</div>' +
+      '<div class="fiyat-ipucu mt-2 text-sm"></div>' +
       '</div>';
   }
 
@@ -287,13 +328,23 @@ function fiyatIpucuGuncelle(satir) {
 
   if (gecersiz) {
     ipucu.innerHTML = '<span class="text-red-700 dark:text-red-300">Geçerli bir fiyat girin (ör. 24,90)</span>';
-  } else if (!sistemFiyatiVar(urun)) {
-    ipucu.innerHTML = '<span class="text-amber-800 dark:text-amber-200">Sistemde fiyat yok, elle girin</span>';
-  } else if (Math.abs(girilen - fiyatSayi(urun.fiyat)) < 0.005) {
-    ipucu.innerHTML = '<span class="text-gray-600 dark:text-gray-400"><i class="ph ph-database mr-1" aria-hidden="true"></i>Sistem fiyatı</span>';
+    return;
+  }
+  if (!sistemFiyatiVar(urun)) {
+    ipucu.innerHTML = '<span class="text-amber-800 dark:text-amber-200">Sistemde fiyat yok, elle girin · etikete bugünün tarihi basılır</span>';
+    return;
+  }
+
+  var farklar = [];
+  if (fiyatSistemdenFarkli(urun)) farklar.push('fiyat (sistemde ₺' + kacir(fiyatBicimle(urun.fiyat)) + ')');
+  if (birimSistemdenFarkli(urun)) farklar.push('birim (sistemde ' + kacir(urun.birim || 'boş') + ')');
+
+  if (farklar.length === 0) {
+    ipucu.innerHTML = '<span class="text-gray-600 dark:text-gray-400"><i class="ph ph-database mr-1" aria-hidden="true"></i>Sistemdeki fiyat ve birim</span>';
   } else {
-    ipucu.innerHTML = '<span class="text-blue-700 dark:text-blue-300">Değiştirildi · sistemde ₺' + kacir(fiyatBicimle(urun.fiyat)) + '</span> ' +
-      '<button type="button" class="fiyat-geri ml-1 min-h-11 px-2 -my-3 text-blue-700 dark:text-blue-300 underline underline-offset-2 cursor-pointer">Sistem fiyatına dön</button>';
+    ipucu.innerHTML = '<span class="text-blue-700 dark:text-blue-300">Değiştirildi: ' + farklar.join(', ') +
+      (fiyatSistemdenFarkli(urun) ? ' · etikete bugünün tarihi basılır' : '') + '</span> ' +
+      '<button type="button" class="fiyat-geri min-h-11 px-2 -my-3 text-blue-700 dark:text-blue-300 underline underline-offset-2 cursor-pointer">Sisteme dön</button>';
   }
 }
 
@@ -311,13 +362,14 @@ function onizlemeyiGuncelle() {
   document.getElementById('yakinlastirmaDeger').textContent = Math.round(olcek * 100) + '%';
 
   for (var i = 0; i < liste.length; i++) {
-    var etiket = etiketOlustur(liste[i], fiyatlar[liste[i].id], olcek);
+    var etiket = etiketOlustur(liste[i], olcek);
     etiket.classList.add('shadow-sm', 'ring-1', 'ring-gray-300', 'dark:ring-gray-600');
     kapsayici.appendChild(etiket);
   }
 }
 
-function etiketOlustur(urun, fiyat, s) {
+function etiketOlustur(urun, s) {
+  var fiyat = fiyatlar[urun.id];
   var div = document.createElement('div');
   div.className = 'etiket-kutu bg-white text-black flex flex-col justify-between overflow-hidden shrink-0';
   div.style.width = (ayarlar.etiket_genislik * s) + 'mm';
@@ -340,7 +392,7 @@ function etiketOlustur(urun, fiyat, s) {
 
   var birimYazi = document.createElement('div');
   birimYazi.style.cssText = yaziStili('birim', s) + 'line-height:1.3;margin-top:' + s + 'mm;';
-  birimYazi.textContent = urun.birim;
+  birimYazi.textContent = birimler[urun.id] || '';
 
   orta.appendChild(fiyatYazi);
   orta.appendChild(birimYazi);
@@ -350,7 +402,7 @@ function etiketOlustur(urun, fiyat, s) {
   var yer = document.createElement('div');
   yer.textContent = urun.uretim_yeri;
   var tarih = document.createElement('div');
-  tarih.textContent = bugunTarih();
+  tarih.textContent = etiketTarihi(urun);
   alt.appendChild(yer);
   alt.appendChild(tarih);
 
@@ -452,7 +504,7 @@ function yazdir() {
   var alan = document.getElementById('yazdirAlani');
   alan.innerHTML = '';
   liste.forEach(function(u) {
-    var etiket = etiketOlustur(u, fiyatlar[u.id], 1);
+    var etiket = etiketOlustur(u, 1);
     etiket.style.pageBreakAfter = 'always';
     etiket.style.margin = '0';
     alan.appendChild(etiket);
@@ -486,7 +538,13 @@ function basimGonder() {
   showLoading('Etiketler yazıcıya gönderiliyor');
 
   var etiketler = liste.map(function(u) {
-    return { id: u.id, ad: u.ad, fiyat: fiyatBicimle(fiyatlar[u.id]) };
+    return {
+      id: u.id,
+      ad: u.ad,
+      fiyat: fiyatBicimle(fiyatlar[u.id]),
+      birim: birimler[u.id] || '',
+      fiyat_tarihi: etiketTarihi(u),
+    };
   });
 
   jsonIste('/api/etiket-ekrani/bas', {
@@ -539,6 +597,9 @@ document.addEventListener('DOMContentLoaded', function() {
       fiyatlar[el.getAttribute('data-fiyat-id')] = el.value;
       fiyatIpucuGuncelle(el.closest('[data-satir]'));
       fiyatDurumunuKontrolEt();
+    } else if (el.classList.contains('birim-input')) {
+      birimler[el.getAttribute('data-birim-id')] = el.value;
+      fiyatIpucuGuncelle(el.closest('[data-satir]'));
     } else if (el.classList.contains('ayar-input') && el.type === 'number') {
       ayarDegisti(el);
     }
@@ -549,11 +610,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!geri) return;
     var satir = geri.closest('[data-satir]');
     var urun = urunBul(satir.getAttribute('data-satir'));
-    var input = satir.querySelector('.fiyat-input');
-    input.value = fiyatBicimle(urun.fiyat);
-    fiyatlar[urun.id] = input.value;
+    var fiyatInput = satir.querySelector('.fiyat-input');
+    var birimInput = satir.querySelector('.birim-input');
+    fiyatInput.value = fiyatBicimle(urun.fiyat);
+    birimInput.value = urun.birim || '';
+    fiyatlar[urun.id] = fiyatInput.value;
+    birimler[urun.id] = birimInput.value;
     fiyatIpucuGuncelle(satir);
     fiyatDurumunuKontrolEt();
-    input.focus();
+    fiyatInput.focus();
   });
 });
