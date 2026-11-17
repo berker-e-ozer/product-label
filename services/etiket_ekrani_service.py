@@ -6,17 +6,17 @@ from pathlib import Path
 DB_YOLU = os.environ.get("ETIKET_DB_YOLU", "etiket_ekrani.db")
 
 VARSAYILAN_AYARLAR = {
-    "urun_adi_yazi_tipi": "Arial",
+    "urun_adi_yazi_tipi": "Times New Roman",
     "urun_adi_boyut": 16,
     "urun_adi_kalin": True,
     "fiyat_yazi_tipi": "Arial",
     "fiyat_boyut": 32,
-    "fiyat_kalin": False,
+    "fiyat_kalin": True,
     "birim_yazi_tipi": "Arial",
     "birim_boyut": 24,
     "birim_kalin": False,
     "alt_metin_yazi_tipi": "Arial",
-    "alt_metin_boyut": 10,
+    "alt_metin_boyut": 6,
     "alt_metin_kalin": False,
     "etiket_genislik": 38,
     "etiket_yukseklik": 58,

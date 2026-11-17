@@ -68,6 +68,7 @@ function fiyatSayi(deger) {
 function fiyatBicimle(deger) {
   var sayi = fiyatSayi(deger);
   if (isNaN(sayi)) return '';
+  if (Math.abs(sayi - Math.round(sayi)) < 0.005) return String(Math.round(sayi));
   return sayi.toFixed(2).replace('.', ',');
 }
 
@@ -371,7 +372,14 @@ function onizlemeyiGuncelle() {
 function etiketOlustur(urun, s) {
   var fiyat = fiyatlar[urun.id];
   var div = document.createElement('div');
-  div.className = 'etiket-kutu bg-white text-black flex flex-col justify-between overflow-hidden shrink-0';
+  div.className = 'etiket-kutu';
+  div.style.display = 'flex';
+  div.style.flexDirection = 'column';
+  div.style.justifyContent = 'space-between';
+  div.style.overflow = 'hidden';
+  div.style.flexShrink = '0';
+  div.style.background = '#fff';
+  div.style.color = '#000';
   div.style.width = (ayarlar.etiket_genislik * s) + 'mm';
   div.style.height = (ayarlar.etiket_yukseklik * s) + 'mm';
   div.style.padding = (ayarlar.ic_bosluk * s) + 'mm';
@@ -384,25 +392,29 @@ function etiketOlustur(urun, s) {
   urunAdi.textContent = urun.ad;
 
   var orta = document.createElement('div');
-  orta.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;';
+  orta.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;';
 
-  var fiyatYazi = document.createElement('div');
-  fiyatYazi.style.cssText = yaziStili('fiyat', s) + 'line-height:1;';
-  fiyatYazi.textContent = '₺' + fiyatBicimle(fiyat);
+  var fiyatSatiri = document.createElement('div');
+  fiyatSatiri.style.cssText = 'display:flex;align-items:baseline;justify-content:center;flex-wrap:wrap;column-gap:' + s + 'mm;line-height:1;';
 
-  var birimYazi = document.createElement('div');
-  birimYazi.style.cssText = yaziStili('birim', s) + 'line-height:1.3;margin-top:' + s + 'mm;';
+  var fiyatYazi = document.createElement('span');
+  fiyatYazi.style.cssText = yaziStili('fiyat', s);
+  fiyatYazi.textContent = fiyatBicimle(fiyat);
+
+  var birimYazi = document.createElement('span');
+  birimYazi.style.cssText = yaziStili('birim', s);
   birimYazi.textContent = birimler[urun.id] || '';
 
-  orta.appendChild(fiyatYazi);
-  orta.appendChild(birimYazi);
+  fiyatSatiri.appendChild(fiyatYazi);
+  fiyatSatiri.appendChild(birimYazi);
+  orta.appendChild(fiyatSatiri);
 
   var alt = document.createElement('div');
-  alt.style.cssText = yaziStili('alt_metin', s) + 'text-align:center;line-height:1.3;';
+  alt.style.cssText = yaziStili('alt_metin', s) + 'text-align:left;line-height:1.3;';
   var yer = document.createElement('div');
-  yer.textContent = urun.uretim_yeri;
+  yer.textContent = 'Üretim Yeri: ' + (urun.uretim_yeri || '');
   var tarih = document.createElement('div');
-  tarih.textContent = etiketTarihi(urun);
+  tarih.textContent = 'Fiyat Değişiklik Tarihi: ' + etiketTarihi(urun);
   alt.appendChild(yer);
   alt.appendChild(tarih);
 

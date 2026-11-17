@@ -57,6 +57,10 @@ class TestAyarlar(unittest.TestCase):
         self.assertEqual(ayarlar["etiket_genislik"], 38)
         self.assertEqual(ayarlar["etiket_yukseklik"], 58)
         self.assertTrue(ayarlar["urun_adi_kalin"])
+        self.assertEqual(ayarlar["urun_adi_yazi_tipi"], "Times New Roman")
+        self.assertTrue(ayarlar["fiyat_kalin"])
+        self.assertFalse(ayarlar["birim_kalin"])
+        self.assertEqual(ayarlar["alt_metin_boyut"], 6)
 
     def test_kaydet_ve_oku(self):
         yeni = dict(servis.VARSAYILAN_AYARLAR)
